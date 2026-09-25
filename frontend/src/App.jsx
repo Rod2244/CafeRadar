@@ -7,13 +7,17 @@ import CafeCard from './components/cafecard';
 import CafeDrawer from './components/cafedrawer';
 import MapView from './components/mapview';
 import ReviewModal from './components/reviewmodal';
+import ProfileDrawer from './components/profiledrawer';
+import SettingsView from './components/settingsview';
+import AIAssistant from './components/aiassistant';
+import LandingPage from './components/landingpage';
 import './App.css';
 
 const NAV_ITEMS = [
   { id: 'discover', label: 'Discover', icon: Compass },
   { id: 'saved', label: 'Saved Cafes', icon: Bookmark },
   { id: 'map', label: 'Radar Map', icon: MapIcon },
-  { id: 'reviews', label: 'Recent Reviews', icon: MessageSquare },
+  { id: 'assistant', label: 'AI Assistant', icon: MessageSquare },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
@@ -27,6 +31,8 @@ export default function App() {
   const [reviewCafe, setReviewCafe] = useState(null);
   const [reviewText, setReviewText] = useState('');
   const [reviewRating, setReviewRating] = useState(5);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [showLanding, setShowLanding] = useState(true);
   const [filters, setFilters] = useState({ openNow: false, fastWifi: false, outlets: false, quiet: false, coffeeStyle: 'All' });
 
   const filteredCafes = useMemo(() => cafes.filter((cafe) => {
@@ -60,10 +66,13 @@ export default function App() {
     setReviewCafe(null);
   };
 
+  if (showLanding) return <LandingPage onEnter={() => setShowLanding(false)} />;
+
   return <div className="app-shell">
-    <aside className="sidebar"><div><div className="brand"><span className="brand-mark"><Coffee size={21} /></span><div><strong>CafeRadar</strong><small>Work-Ready Cafes</small></div></div><nav>{NAV_ITEMS.map(({ id, label, icon: Icon }) => <button key={id} className={activeTab === id ? 'active' : ''} onClick={() => selectTab(id)}><Icon size={16} /> {label}{id === 'saved' && savedCafeIds.size > 0 && <span className="nav-count">{savedCafeIds.size}</span>}</button>)}</nav></div><div className="profile"><span>JD</span><div><strong>Jane Doe</strong><small>Digital Nomad</small></div></div></aside>
-    <main className="main-content"><Header searchQuery={searchQuery} setSearchQuery={setSearchQuery} viewMode={viewMode} setViewMode={setViewMode} /><div className="content-scroll"><FilterBar filters={filters} setFilters={setFilters} />{viewMode === 'grid' ? <section className="results"><div className="results-heading"><div><span className="eyebrow">Your workday, curated</span><h1>{activeTab === 'saved' ? 'Saved Spots' : 'Nearby Cafes'} <small>({filteredCafes.length} found)</small></h1></div><span className="location-label">Downtown radius <b>2 mi</b></span></div>{filteredCafes.length ? <div className="cafe-grid">{filteredCafes.map((cafe) => <CafeCard key={cafe.id} cafe={cafe} isSaved={savedCafeIds.has(cafe.id)} onSelect={setSelectedCafe} onToggleSave={toggleSave} />)}</div> : <div className="empty-state"><Coffee size={36} /><h2>No cafes match your filters</h2><p>Try relaxing your search criteria or filter tags.</p></div>}</section> : <MapView cafes={filteredCafes} onSelect={setSelectedCafe} />}</div></main>
+    <aside className="sidebar"><div><div className="brand"><span className="brand-mark"><Coffee size={21} /></span><div><strong>CafeRadar</strong><small>Work-Ready Cafes</small></div></div><nav>{NAV_ITEMS.map(({ id, label, icon: Icon }) => <button key={id} className={activeTab === id ? 'active' : ''} onClick={() => selectTab(id)}><Icon size={16} /> {label}{id === 'saved' && savedCafeIds.size > 0 && <span className="nav-count">{savedCafeIds.size}</span>}</button>)}</nav></div><button className="profile" onClick={() => setIsProfileOpen(true)} aria-label="Open Jane Doe profile"><span>JD</span><div><strong>Jane Doe</strong><small>Digital Nomad</small></div><Settings size={14} /></button></aside>
+    <main className="main-content"><Header searchQuery={searchQuery} setSearchQuery={setSearchQuery} viewMode={viewMode} setViewMode={setViewMode} onSelectTab={selectTab} /><div className="content-scroll">{activeTab === 'settings' ? <SettingsView /> : activeTab === 'assistant' ? <AIAssistant /> : <><FilterBar filters={filters} setFilters={setFilters} />{viewMode === 'grid' ? <section className="results"><div className="results-heading"><div><span className="eyebrow">Your workday, curated</span><h1>{activeTab === 'saved' ? 'Saved Spots' : 'Nearby Cafes'} <small>({filteredCafes.length} found)</small></h1></div><span className="location-label">Downtown radius <b>2 mi</b></span></div>{filteredCafes.length ? <div className="cafe-grid">{filteredCafes.map((cafe) => <CafeCard key={cafe.id} cafe={cafe} isSaved={savedCafeIds.has(cafe.id)} onSelect={setSelectedCafe} onToggleSave={toggleSave} />)}</div> : <div className="empty-state"><Coffee size={36} /><h2>No cafes match your filters</h2><p>Try relaxing your search criteria or filter tags.</p></div>}</section> : <MapView cafes={filteredCafes} onSelect={setSelectedCafe} />}</>}</div></main>
     <CafeDrawer cafe={selectedCafe} isSaved={selectedCafe && savedCafeIds.has(selectedCafe.id)} onClose={() => setSelectedCafe(null)} onToggleSave={toggleSave} onAddReview={() => setReviewCafe(selectedCafe)} />
     <ReviewModal cafe={reviewCafe} rating={reviewRating} setRating={setReviewRating} text={reviewText} setText={setReviewText} onSubmit={submitReview} onClose={() => setReviewCafe(null)} />
+    <ProfileDrawer isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} savedCount={savedCafeIds.size} reviewCount={cafes.reduce((total, cafe) => total + cafe.reviews.filter((review) => review.author === 'You').length, 0)} />
   </div>;
 }
