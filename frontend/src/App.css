@@ -1,3 +1,50 @@
+.rafael-chat-launcher { position: fixed; z-index: 1200; right: 24px; bottom: 24px; display: grid; place-items: center; width: 54px; height: 54px; color: #10172c; border: 1px solid #b4bcff; border-radius: 50%; background: #8996ff; box-shadow: 0 8px 24px rgba(0,0,0,.4),0 0 0 5px rgba(137,150,255,.12); transition: transform .18s,background .18s; }
+.rafael-chat-launcher:hover { background: #aab3ff; transform: translateY(-2px); }
+.rafael-widget-panel { position: fixed; z-index: 1199; right: 24px; bottom: 91px; display: flex; flex-direction: column; width: min(390px,calc(100vw - 32px)); height: min(560px,calc(100dvh - 112px)); min-height: 310px; overflow: hidden; color: var(--text); border: 1px solid #303b62; border-radius: 12px; background: #0b1122; box-shadow: 0 20px 60px rgba(0,0,0,.55); }
+.rafael-widget-header { display: flex; align-items: center; gap: 9px; min-height: 56px; padding: 9px 12px; border-bottom: 1px solid #252f55; background: #121934; }
+.rafael-widget-avatar { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 32px; color: #d5d9ff; border: 1px solid #7785ff; border-radius: 10px; background: #283460; }
+.rafael-widget-title { display: grid; min-width: 0; flex: 1; gap: 2px; }
+.rafael-widget-title strong { color: #f1f3ff; font: 600 12px 'Space Grotesk'; }
+.rafael-widget-title small { overflow: hidden; color: #8995bd; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.rafael-widget-new,.rafael-widget-close { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 30px; color: #b9c3e4; border: 1px solid #303b62; border-radius: 7px; background: #18213d; }
+.rafael-widget-new:hover,.rafael-widget-close:hover { color: white; border-color: #8996ff; }
+.rafael-widget-messages { min-height: 0; padding: 15px 12px; }
+.rafael-widget-messages .ai-message { max-width: 96%; }
+.rafael-widget-messages .ai-message-avatar { width: 23px; height: 23px; flex-basis: 23px; }
+.rafael-widget-messages .ai-message-content { padding: 9px 10px; font-size: 10px; }
+.rafael-widget-messages .ai-message small { font-size: 8px; }
+.rafael-widget-composer { display: flex; align-items: center; gap: 7px; padding: 10px; border-top: 1px solid #252f55; background: #0d1428; }
+.rafael-widget-composer input { min-width: 0; flex: 1; padding: 10px 11px; color: #edf0ff; border: 1px solid #303b62; border-radius: 8px; outline: none; background: #10182f; font-size: 11px; }
+.rafael-widget-composer input:focus { border-color: #8996ff; }
+.rafael-widget-composer button { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; color: #111827; border: 0; border-radius: 8px; background: #8996ff; }
+.rafael-widget-composer button:hover { background: #aab3ff; }
+.rafael-widget-composer button:disabled { cursor: not-allowed; opacity: .45; }
+@media (max-width: 640px) { .rafael-chat-launcher { right: 16px; bottom: 16px; width: 50px; height: 50px; }.rafael-widget-panel { right: 16px; bottom: 78px; width: calc(100vw - 32px); height: min(560px,calc(100dvh - 96px)); } }
+.ai-thread-toolbar { position: relative; display: flex; gap: 7px; padding: 9px 17px; border-bottom: 1px solid #252f55; background: rgba(11,17,36,.78); }
+.ai-thread-button { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; color: #aeb9d8; border: 1px solid #303b62; border-radius: 7px; background: #131c37; font-size: 10px; font-weight: 700; }
+.ai-thread-button:hover,.ai-thread-button[aria-expanded="true"] { color: #f1f3ff; border-color: #8996ff; }
+.ai-thread-button svg { color: #aab4ff; }
+.ai-thread-button span { display: grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; color: #10172c; border-radius: 8px; background: #8996ff; font-size: 9px; }
+.ai-history-list { position: absolute; z-index: 8; top: calc(100% + 3px); left: 17px; display: grid; width: min(340px, calc(100% - 34px)); max-height: 260px; overflow-y: auto; border: 1px solid #303b62; border-radius: 8px; background: #10182f; box-shadow: 0 14px 32px rgba(0,0,0,.42); }
+.ai-history-list button { display: grid; gap: 4px; min-width: 0; padding: 10px 12px; color: #cbd3e8; text-align: left; border: 0; border-bottom: 1px solid #222d4b; background: transparent; }
+.ai-history-list button:last-child { border-bottom: 0; }
+.ai-history-list button:hover,.ai-history-list button.active { background: #1a2545; }
+.ai-history-list strong { overflow: hidden; color: #edf0fa; font-size: 10px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ai-history-list small { color: #818eaf; font-size: 9px; }
+.ai-message-content { margin: 0; padding: 11px 13px; color: #c7d0e5; border: 1px solid #252f4e; border-radius: 4px 12px 12px 12px; background: #141d35; font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
+.ai-message.user .ai-message-content { color: #101827; border-color: #ffbd35; border-radius: 12px 4px 12px 12px; background: var(--amber); }
+.ai-message-content > :first-child { margin-top: 0; }
+.ai-message-content > :last-child { margin-bottom: 0; }
+.ai-message-content p { margin: 0 0 7px; padding: 0; color: inherit; border: 0; border-radius: 0; background: transparent; font: inherit; line-height: inherit; }
+.ai-message-content ul,.ai-message-content ol { margin: 6px 0; padding-left: 18px; }
+.ai-message-content li { margin: 3px 0; }
+.ai-message-content strong { font-weight: 700; }
+.ai-message.user .ai-message-content p { color: inherit; border: 0; background: transparent; }
+.status-badge.unknown { color: #e1e8f2; background: rgba(41,56,78,.82); }
+.osm-attribution { color: var(--muted); font-size: 9px; }
+.osm-attribution a,.osm-source-link { color: var(--cyan); }
+.osm-source-link { display: inline-block; margin-top: 18px; font-size: 10px; }
+.drawer-footer { display: grid; gap: 8px; }
 :root { --bg: #070b16; --panel: #0d1425; --line: #1b2941; --muted: #8190aa; --text: #f4f5f7; --amber: #ffb21a; --cyan: #38d4ed; --green: #47d7a1; --blue: #8996ff; }
 .app-shell { height: 100vh; min-height: 0; overflow: hidden; }
 .sidebar { height: 100vh; min-height: 0; overflow-y: auto; overflow-x: hidden; }

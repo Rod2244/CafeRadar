@@ -1,13 +1,35 @@
-export const INITIAL_CAFES = [
-	{
-		id: '1', name: 'Artisan Roast & Byte', tagline: 'Quiet sanctuary with gigabit fiber and specialty espresso.', address: '104 Tech Boulevard, Downtown', distance: '0.3 mi', isOpen: true, rating: 4.8, reviewCount: 124, wifiSpeed: '180 Mbps', wifiCategory: 'fast', outlets: 'Plentiful', noiseLevel: 'Quiet', coffeeStyles: ['Espresso', 'Cold Brew', 'Matcha'], image: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=900&q=85', amenities: ['Gigabit WiFi', 'Power at every desk', 'Air Conditioned', 'Pet Friendly', 'Outdoor Seating'], coordinates: { lat: 14.5995, lng: 120.9842 }, peakHours: [15, 30, 65, 90, 80, 50, 40, 20], reviews: [
-			{ id: 'r1', author: 'Alex M.', rating: 5, time: '2 hours ago', text: 'Best cold brew in town! Outlets are everywhere and the WiFi never drops.' },
-			{ id: 'r2', author: 'Sarah K.', rating: 4, time: 'Yesterday', text: 'Very quiet around 10 AM. Perfect for deep work sessions.' },
-		],
-	},
-	{ id: '2', name: 'Velvet Drip Lounge', tagline: 'Cozy aesthetic vibe with craft matcha and soft ambient lo-fi.', address: '42 Bloom Street, Westside', distance: '0.8 mi', isOpen: true, rating: 4.6, reviewCount: 89, wifiSpeed: '95 Mbps', wifiCategory: 'fast', outlets: 'Moderate', noiseLevel: 'Moderate', coffeeStyles: ['Matcha', 'Espresso'], image: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=900&q=85', amenities: ['Air Conditioned', 'Outdoor Seating', 'Vegan Snacks'], coordinates: { lat: 14.6042, lng: 120.9822 }, peakHours: [20, 50, 85, 95, 70, 60, 45, 30], reviews: [{ id: 'r3', author: 'David L.', rating: 5, time: '3 days ago', text: 'Matcha latte is top notch. Aesthetic is unmatched.' }] },
-	{ id: '3', name: 'Brew & Code Hub', tagline: 'Built for remote workers. Ergonomic chairs and heavy espresso.', address: '77 Innovation Way, North District', distance: '1.2 mi', isOpen: false, rating: 4.9, reviewCount: 210, wifiSpeed: '320 Mbps', wifiCategory: 'fast', outlets: 'Plentiful', noiseLevel: 'Quiet', coffeeStyles: ['Espresso', 'Cold Brew'], image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=900&q=85', amenities: ['Gigabit WiFi', 'Standing Desks', 'Private Call Booths', 'Air Conditioned'], coordinates: { lat: 14.6091, lng: 121.0223 }, peakHours: [10, 40, 75, 88, 92, 85, 60, 30], reviews: [{ id: 'r4', author: 'Elena R.', rating: 5, time: '1 week ago', text: 'Call booths are a lifesaver for Zoom meetings!' }] },
-	{ id: '4', name: 'The Daily Grind Garden', tagline: 'Open-air botanical patio featuring slow-drip cold brew.', address: '15 Sunshine Alley, Old Town', distance: '1.5 mi', isOpen: true, rating: 4.5, reviewCount: 67, wifiSpeed: '45 Mbps', wifiCategory: 'moderate', outlets: 'Sparse', noiseLevel: 'Lively', coffeeStyles: ['Cold Brew', 'Matcha'], image: 'https://images.unsplash.com/photo-1442512595331-e89e73853f31?auto=format&fit=crop&w=900&q=85', amenities: ['Outdoor Seating', 'Pet Friendly', 'Natural Lighting'], coordinates: { lat: 14.5547, lng: 121.0244 }, peakHours: [30, 60, 90, 100, 85, 75, 50, 20], reviews: [{ id: 'r5', author: 'Marcus B.', rating: 4, time: '4 days ago', text: 'Lovely patio! Not too many outlets, so bring a fully charged laptop.' }] },
+const MAPPED_CAFES = [
+	{ osmType: 'node', osmId: '9773250038', name: 'Cafe Corner', address: '466 Mayor M.S. Jaldon Street, Armor Village, Santa Maria, Zamboanga City', lat: 6.9157960, lng: 122.0719364 },
+	{ osmType: 'node', osmId: '4916163222', name: 'Villagio Cafe', address: 'La Purisima Street, Santa Catalina, Zamboanga City', lat: 6.9066352, lng: 122.0762909 },
+	{ osmType: 'node', osmId: '14056402891', name: 'Wakahers Cafe', address: 'Governor Camins Avenue, Santa Maria, Zamboanga City', lat: 6.9201660, lng: 122.0684410 },
+	{ osmType: 'way', osmId: '1528157745', name: "Lorain's Café", address: 'Governor Camins Avenue, Santa Maria, Zamboanga City', lat: 6.9211287, lng: 122.0755422 },
+	{ osmType: 'node', osmId: '13227091364', name: 'Dwntwn Café', address: 'N.S. Valderosa Street, Santa Catalina, Zamboanga City', lat: 6.9027396, lng: 122.0785779 },
+	{ osmType: 'node', osmId: '13926659545', name: 'HAYA Café', address: 'Veterans Avenue, Santa Catalina, Zamboanga City', lat: 6.9150392, lng: 122.0793581 },
+	{ osmType: 'node', osmId: '13974830026', name: 'Starbucks', address: 'Mayor Vitaliano D. Agan Avenue, Santa Maria, Zamboanga City', lat: 6.9178122, lng: 122.0758447 },
 ];
+
+const CAFE_IMAGE = 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=900&q=85';
+
+export const INITIAL_CAFES = MAPPED_CAFES.map((cafe) => ({
+	id: `osm-${cafe.osmType}-${cafe.osmId}`,
+	name: cafe.name,
+	tagline: 'Hours, ratings, and work amenities are not listed in OpenStreetMap.',
+	address: cafe.address,
+	distance: '—',
+	isOpen: null,
+	rating: null,
+	reviewCount: 0,
+	wifiSpeed: 'Not listed',
+	wifiCategory: 'unknown',
+	outlets: 'Not listed',
+	noiseLevel: 'Not listed',
+	coffeeStyles: [],
+	image: CAFE_IMAGE,
+	amenities: [],
+	coordinates: { lat: cafe.lat, lng: cafe.lng },
+	peakHours: [],
+	reviews: [],
+	osmUrl: `https://www.openstreetmap.org/${cafe.osmType}/${cafe.osmId}`,
+}));
 
 export const COFFEE_STYLES = ['All', 'Espresso', 'Cold Brew', 'Matcha'];
