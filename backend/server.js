@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
+import authRoutes from './routes/authRoutes.js';
 
 dotenv.config();
 
@@ -11,6 +12,7 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 
 app.use(cors());
 app.use(express.json());
+app.use('/api/auth', authRoutes);
 
 // Keep Gemini credentials on the server; never expose them to the frontend.
 const ai = process.env.GEMINI_API_KEY

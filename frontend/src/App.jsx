@@ -13,6 +13,7 @@ import AIAssistant from './components/aiassistant';
 import RafaelChatWidget from './components/rafaelchatwidget';
 import LandingPage from './components/landingpage';
 import useRafaelChat from './hooks/useRafaelChat';
+import { clearStoredSession, getStoredSession, restoreSession, signOut, storeSession } from './services/auth';
 import './App.css';
 
 const NAV_ITEMS = [
@@ -54,8 +55,19 @@ export default function App() {
   const [reviewText, setReviewText] = useState('');
   const [reviewRating, setReviewRating] = useState(5);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [authenticatedUser, setAuthenticatedUser] = useState(null);
   const [showLanding, setShowLanding] = useState(() => window.location.pathname === '/');
   const [filters, setFilters] = useState({ openNow: false, fastWifi: false, outlets: false, quiet: false, coffeeStyle: 'All' });
+
+  useEffect(() => {
+    let isMounted = true;
+    restoreSession()
+      .then((result) => {
+        if (isMounted) setAuthenticatedUser(result?.user || null);
+      })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, []);
 
   useEffect(() => {
     if (showLanding || !['discover', 'saved', 'map', 'assistant'].includes(activeTab)) return undefined;
@@ -114,6 +126,33 @@ export default function App() {
     if (window.location.pathname !== `/${tab}`) window.history.pushState({}, '', `/${tab}`);
   };
 
+  const handleAuthenticated = ({ user, session }) => {
+    storeSession(session);
+    setAuthenticatedUser(user);
+    setShowLanding(false);
+    selectTab('discover');
+  };
+
+  const handleProfileUpdated = ({ user, session }) => {
+    if (session) storeSession(session);
+    setAuthenticatedUser(user);
+  };
+
+  const handleSignOut = async () => {
+    const session = getStoredSession();
+    try {
+      if (session?.access_token) await signOut(session.access_token);
+    } catch {
+      // Clear the local session even if the backend cannot be reached.
+    } finally {
+      clearStoredSession();
+      setAuthenticatedUser(null);
+      setIsProfileOpen(false);
+      setShowLanding(true);
+      window.history.replaceState({}, '', '/');
+    }
+  };
+
   const toggleSave = (event, id) => {
     event.stopPropagation();
     setSavedCafeIds((current) => {
@@ -139,7 +178,10 @@ export default function App() {
     setReviewCafe(null);
   };
 
-  if (showLanding) return <LandingPage onEnter={() => { setShowLanding(false); selectTab('discover'); }} />;
+  if (showLanding) return <LandingPage onEnter={() => { setShowLanding(false); selectTab('discover'); }} onAuthenticated={handleAuthenticated} />;
+
+  const profileName = authenticatedUser?.user_metadata?.full_name || authenticatedUser?.email?.split('@')[0] || 'Jane Doe';
+  const profileInitials = profileName.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 
   const displayedLocationStatus = typeof navigator !== 'undefined' && !navigator.geolocation
     ? 'Location is not supported by this browser'
@@ -151,12 +193,12 @@ export default function App() {
         <div className="brand"><span className="brand-mark"><Coffee size={21} /></span><div><strong>CafeRadar</strong><small>Work-Ready Cafes</small></div></div>
         <nav>{NAV_ITEMS.map(({ id, label, icon: Icon }) => <button key={id} className={activeTab === id ? 'active' : ''} onClick={() => selectTab(id)}><Icon size={16} /> {label}{id === 'saved' && savedCafeIds.size > 0 && <span className="nav-count">{savedCafeIds.size}</span>}</button>)}</nav>
       </div>
-      <button className="profile" onClick={() => setIsProfileOpen(true)} aria-label="Open Jane Doe profile"><span>JD</span><div><strong>Jane Doe</strong><small>Digital Nomad</small></div><Settings size={14} /></button>
+      <button className="profile" onClick={() => setIsProfileOpen(true)} aria-label={`Open ${profileName} profile`}><span>{profileInitials}</span><div><strong>{profileName}</strong><small>{authenticatedUser?.email || 'Digital Nomad'}</small></div><Settings size={14} /></button>
     </aside>
     <main className="main-content">
       <Header searchQuery={searchQuery} setSearchQuery={setSearchQuery} viewMode={viewMode} setViewMode={setViewMode} onSelectTab={selectTab} />
       <div className="content-scroll">
-        {activeTab === 'settings' ? <SettingsView /> : activeTab === 'assistant' ? <AIAssistant chat={rafaelChat} nearbyCafes={assistantCafes} savedCafes={savedCafes} userLocation={userLocation} /> : <>
+        {activeTab === 'settings' ? <SettingsView key={authenticatedUser?.id || 'guest'} user={authenticatedUser} onProfileUpdated={handleProfileUpdated} /> : activeTab === 'assistant' ? <AIAssistant chat={rafaelChat} nearbyCafes={assistantCafes} savedCafes={savedCafes} userLocation={userLocation} userInitials={profileInitials} /> : <>
           <FilterBar filters={filters} setFilters={setFilters} />
           {viewMode === 'grid' ? <section className="results">
             <div className="results-heading">
@@ -173,9 +215,9 @@ export default function App() {
         </>}
       </div>
     </main>
-    <RafaelChatWidget activeTab={activeTab} chat={rafaelChat} nearbyCafes={assistantCafes} savedCafes={savedCafes} userLocation={userLocation} />
+    <RafaelChatWidget activeTab={activeTab} chat={rafaelChat} nearbyCafes={assistantCafes} savedCafes={savedCafes} userLocation={userLocation} userInitials={profileInitials} />
     <CafeDrawer cafe={selectedCafe} isSaved={selectedCafe && savedCafeIds.has(selectedCafe.id)} onClose={() => setSelectedCafe(null)} onToggleSave={toggleSave} onAddReview={() => setReviewCafe(selectedCafe)} onNavigate={navigateToCafe} />
     <ReviewModal cafe={reviewCafe} rating={reviewRating} setRating={setReviewRating} text={reviewText} setText={setReviewText} onSubmit={submitReview} onClose={() => setReviewCafe(null)} />
-    <ProfileDrawer isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} savedCount={savedCafeIds.size} reviewCount={cafes.reduce((total, cafe) => total + cafe.reviews.filter((review) => review.author === 'You').length, 0)} />
+    <ProfileDrawer isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} onSignOut={handleSignOut} user={authenticatedUser} savedCount={savedCafeIds.size} reviewCount={cafes.reduce((total, cafe) => total + cafe.reviews.filter((review) => review.author === 'You').length, 0)} />
   </div>;
 }
