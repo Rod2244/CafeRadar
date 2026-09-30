@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { apiUrl } from '../services/api';
 
 const CONVERSATION_STORAGE_KEY = 'caferadar-rafael-conversations';
 const WELCOME_TEXT = 'Hello, I am Rafael. Tell me what your workday needs, and I will help you find the right cafe.';
@@ -126,7 +127,7 @@ export default function useRafaelChat() {
         .filter((message, index) => index > 0 || message.role === 'user')
         .slice(-20)
         .map((message) => ({ role: message.role === 'assistant' ? 'model' : 'user', text: message.text }));
-      const response = await fetch('/api/chat', {
+      const response = await fetch(apiUrl('/api/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

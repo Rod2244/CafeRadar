@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bookmark, Coffee, Compass, Map as MapIcon, MessageSquare, Settings } from 'lucide-react';
-import { INITIAL_CAFES } from './data/mockdata';
+import { fetchNearbyCafes } from './services/cafes';
 import Header from './components/header';
 import FilterBar from './components/filterbar';
 import CafeCard from './components/cafecard';
@@ -42,7 +42,8 @@ function getTabFromPath(pathname) {
 
 export default function App() {
   const rafaelChat = useRafaelChat();
-  const [cafes, setCafes] = useState(INITIAL_CAFES);
+  const [cafes, setCafes] = useState([]);
+  const [isLoadingCafes, setIsLoadingCafes] = useState(false);
   const [activeTab, setActiveTab] = useState(() => getTabFromPath(window.location.pathname));
   const [viewMode, setViewMode] = useState(() => getTabFromPath(window.location.pathname) === 'map' ? 'map' : 'grid');
   const [searchQuery, setSearchQuery] = useState('');
@@ -55,22 +56,47 @@ export default function App() {
   const [reviewText, setReviewText] = useState('');
   const [reviewRating, setReviewRating] = useState(5);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [authenticatedUser, setAuthenticatedUser] = useState(null);
   const [showLanding, setShowLanding] = useState(() => window.location.pathname === '/');
+  const [authReady, setAuthReady] = useState(false);
   const [filters, setFilters] = useState({ openNow: false, fastWifi: false, outlets: false, quiet: false, coffeeStyle: 'All' });
 
   useEffect(() => {
     let isMounted = true;
+    setAuthReady(false);
+
     restoreSession()
       .then((result) => {
-        if (isMounted) setAuthenticatedUser(result?.user || null);
+        if (!isMounted) return;
+
+        const user = result?.user || null;
+        setAuthenticatedUser(user);
+
+        if (!user && window.location.pathname !== '/') {
+          window.history.replaceState({}, '', '/');
+        }
+
+        setShowLanding(!user || window.location.pathname === '/');
       })
-      .catch(() => {});
+      .catch(() => {
+        if (isMounted) {
+          setAuthenticatedUser(null);
+          setShowLanding(true);
+          if (window.location.pathname !== '/') {
+            window.history.replaceState({}, '', '/');
+          }
+        }
+      })
+      .finally(() => {
+        if (isMounted) setAuthReady(true);
+      });
+
     return () => { isMounted = false; };
   }, []);
 
   useEffect(() => {
-    if (showLanding || !['discover', 'saved', 'map', 'assistant'].includes(activeTab)) return undefined;
+    if (!authReady || !authenticatedUser || showLanding || !['discover', 'saved', 'map', 'assistant'].includes(activeTab)) return undefined;
     if (!navigator.geolocation) return undefined;
 
     const watchId = navigator.geolocation.watchPosition(
@@ -85,16 +111,62 @@ export default function App() {
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [activeTab, showLanding]);
+  }, [activeTab, authReady, authenticatedUser, showLanding]);
+
+  useEffect(() => {
+    if (!userLocation) {
+      setCafes([]);
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    const loadNearbyCafes = async () => {
+      setIsLoadingCafes(true);
+      try {
+        const nearby = await fetchNearbyCafes({
+          lat: userLocation.lat,
+          lng: userLocation.lng,
+          radius: 10000,
+        });
+
+        if (isMounted) {
+          setCafes(nearby);
+        }
+      } catch (error) {
+        console.error('Could not fetch nearby cafes:', error);
+        if (isMounted) {
+          setCafes([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingCafes(false);
+        }
+      }
+    };
+
+    loadNearbyCafes();
+    return () => {
+      isMounted = false;
+    };
+  }, [userLocation]);
 
   const nearbyCafes = useMemo(() => {
     if (!userLocation) return activeTab === 'discover' ? [] : cafes;
-    const cafesWithDistance = cafes.map((cafe) => {
-      const distance = distanceInMeters(userLocation, cafe.coordinates);
-      return { ...cafe, distance: distance < 100 ? '<0.1 km' : `${(distance / 1000).toFixed(1)} km` };
-    });
+
+    const cafesWithDistance = cafes
+      .map((cafe) => {
+        const meters = distanceInMeters(userLocation, cafe.coordinates);
+        return {
+          ...cafe,
+          _distanceMeters: meters,
+          distance: meters < 100 ? '<0.1 km' : `${(meters / 1000).toFixed(1)} km`,
+        };
+      })
+      .sort((first, second) => first._distanceMeters - second._distanceMeters);
+
     return activeTab === 'discover'
-      ? cafesWithDistance.filter((cafe) => distanceInMeters(userLocation, cafe.coordinates) <= DISCOVER_RADIUS_METERS)
+      ? cafesWithDistance.filter((cafe) => cafe._distanceMeters <= DISCOVER_RADIUS_METERS)
       : cafesWithDistance;
   }, [cafes, activeTab, userLocation]);
 
@@ -110,17 +182,26 @@ export default function App() {
   useEffect(() => {
     const handlePopState = () => {
       const tab = getTabFromPath(window.location.pathname);
+      const isRootRoute = window.location.pathname === '/';
       setActiveTab(tab);
       setViewMode(tab === 'map' ? 'map' : 'grid');
-      setShowLanding(window.location.pathname === '/');
+
+      if (!authenticatedUser && !isRootRoute) {
+        window.history.replaceState({}, '', '/');
+        setShowLanding(true);
+        return;
+      }
+
+      setShowLanding(isRootRoute && !authenticatedUser);
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [authenticatedUser]);
 
   const selectTab = (tab) => {
     setActiveTab(tab);
+    setIsMobileNavOpen(false);
     if (tab === 'map') setViewMode('map');
     else if (tab === 'discover' || tab === 'saved') setViewMode('grid');
     if (window.location.pathname !== `/${tab}`) window.history.pushState({}, '', `/${tab}`);
@@ -178,7 +259,8 @@ export default function App() {
     setReviewCafe(null);
   };
 
-  if (showLanding) return <LandingPage onEnter={() => { setShowLanding(false); selectTab('discover'); }} onAuthenticated={handleAuthenticated} />;
+  if (!authReady) return <div className="auth-check-screen"><div className="auth-check-card">Checking your session…</div></div>;
+  if (!authenticatedUser || showLanding) return <LandingPage onEnter={() => { setShowLanding(false); selectTab('discover'); }} onAuthenticated={handleAuthenticated} />;
 
   const profileName = authenticatedUser?.user_metadata?.full_name || authenticatedUser?.email?.split('@')[0] || 'Jane Doe';
   const profileInitials = profileName.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
@@ -187,16 +269,17 @@ export default function App() {
     ? 'Location is not supported by this browser'
     : locationStatus;
 
-  return <div className="app-shell">
-    <aside className="sidebar">
+  return <div className={`app-shell ${isMobileNavOpen || isProfileOpen ? 'nav-open' : ''}`}>
+    <button className={`mobile-nav-backdrop ${isMobileNavOpen ? 'visible' : ''}`} type="button" aria-label="Close navigation drawer" onClick={() => setIsMobileNavOpen(false)} />
+    <aside className={`sidebar ${isMobileNavOpen ? 'mobile-open' : ''}`}>
       <div>
         <div className="brand"><span className="brand-mark"><Coffee size={21} /></span><div><strong>CafeRadar</strong><small>Work-Ready Cafes</small></div></div>
         <nav>{NAV_ITEMS.map(({ id, label, icon: Icon }) => <button key={id} className={activeTab === id ? 'active' : ''} onClick={() => selectTab(id)}><Icon size={16} /> {label}{id === 'saved' && savedCafeIds.size > 0 && <span className="nav-count">{savedCafeIds.size}</span>}</button>)}</nav>
       </div>
-      <button className="profile" onClick={() => setIsProfileOpen(true)} aria-label={`Open ${profileName} profile`}><span>{profileInitials}</span><div><strong>{profileName}</strong><small>{authenticatedUser?.email || 'Digital Nomad'}</small></div><Settings size={14} /></button>
+      <button className="profile" onClick={() => { setIsProfileOpen(true); setIsMobileNavOpen(false); }} aria-label={`Open ${profileName} profile`}><span>{profileInitials}</span><div><strong>{profileName}</strong><small>{authenticatedUser?.email || 'Digital Nomad'}</small></div><Settings size={14} /></button>
     </aside>
     <main className="main-content">
-      <Header searchQuery={searchQuery} setSearchQuery={setSearchQuery} viewMode={viewMode} setViewMode={setViewMode} onSelectTab={selectTab} />
+      <Header searchQuery={searchQuery} setSearchQuery={setSearchQuery} viewMode={viewMode} setViewMode={setViewMode} onSelectTab={selectTab} onToggleSidebar={() => setIsMobileNavOpen((current) => !current)} isMobileNavOpen={isMobileNavOpen} />
       <div className="content-scroll">
         {activeTab === 'settings' ? <SettingsView key={authenticatedUser?.id || 'guest'} user={authenticatedUser} onProfileUpdated={handleProfileUpdated} /> : activeTab === 'assistant' ? <AIAssistant chat={rafaelChat} nearbyCafes={assistantCafes} savedCafes={savedCafes} userLocation={userLocation} userInitials={profileInitials} /> : <>
           <FilterBar filters={filters} setFilters={setFilters} />
@@ -206,7 +289,11 @@ export default function App() {
               <span className="location-label">{activeTab === 'discover' ? displayedLocationStatus : 'Downtown radius'} <b>{activeTab === 'discover' ? '10 km' : '2 mi'}</b></span>
               {activeTab === 'discover' && <small className="osm-attribution">Cafe data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a></small>}
             </div>
-            {filteredCafes.length ? <div className="cafe-grid">{filteredCafes.map((cafe) => <CafeCard key={cafe.id} cafe={cafe} isSaved={savedCafeIds.has(cafe.id)} onSelect={setSelectedCafe} onToggleSave={toggleSave} />)}</div> : <div className="empty-state">
+            {isLoadingCafes ? <div className="empty-state">
+              <Coffee size={36} />
+              <h2>Finding nearby cafes...</h2>
+              <p>Checking the live cafe feed near your current location.</p>
+            </div> : filteredCafes.length ? <div className="cafe-grid">{filteredCafes.map((cafe) => <CafeCard key={cafe.id} cafe={cafe} isSaved={savedCafeIds.has(cafe.id)} onSelect={setSelectedCafe} onToggleSave={toggleSave} />)}</div> : <div className="empty-state">
               <Coffee size={36} />
               <h2>{activeTab === 'discover' && !userLocation ? displayedLocationStatus : 'No cafes match your filters'}</h2>
               <p>{activeTab === 'discover' && !userLocation ? 'Allow location access to find cafes near you.' : 'Try relaxing your search criteria or filter tags.'}</p>

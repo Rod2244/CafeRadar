@@ -1,3 +1,5 @@
+import { apiUrl } from './api';
+
 const SESSION_STORAGE_KEY = 'caferadar.auth.session';
 
 async function request(path, { method = 'GET', body, accessToken } = {}) {
@@ -5,7 +7,7 @@ async function request(path, { method = 'GET', body, accessToken } = {}) {
   if (body) headers['Content-Type'] = 'application/json';
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     method,
     headers,
     ...(body ? { body: JSON.stringify(body) } : {}),

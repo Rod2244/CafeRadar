@@ -5,8 +5,10 @@ export default function CafeCard({ cafe, isSaved, onSelect, onToggleSave }) {
 		<div className="card-image-wrap">
 			<img src={cafe.image} alt="Cafe interior" className="card-image" />
 			<div className="image-shade" />
-			<span className={`status-badge ${cafe.isOpen === true ? 'open' : cafe.isOpen === false ? 'closed' : 'unknown'}`}>{cafe.isOpen === true ? 'Open Now' : cafe.isOpen === false ? 'Closed' : 'Hours not listed'}</span>
+			{cafe.isOpen === true && <span className="status-badge open">Open Now</span>}
+			{cafe.isOpen === false && <span className="status-badge closed">Closed</span>}
 			<span className="distance-badge">{cafe.distance}</span>
+			<span className={`source-badge ${cafe.source === 'overpass' ? 'live' : 'fallback'}`}>{cafe.source === 'overpass' ? 'Live OSM' : 'Fallback'}</span>
 			<button className={`save-button ${isSaved ? 'saved' : ''}`} onClick={(event) => onToggleSave(event, cafe.id)} aria-label={isSaved ? `Remove ${cafe.name} from saved` : `Save ${cafe.name}`}><Heart size={15} fill={isSaved ? 'currentColor' : 'none'} /></button>
 			<div className="card-title"><h3>{cafe.name}</h3><p>{cafe.address}</p></div>
 		</div>
