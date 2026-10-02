@@ -1,6 +1,6 @@
-import { Heart, Star, Volume2, Wifi, Zap } from 'lucide-react';
+import { CreditCard, Heart, Star, Wifi, Zap } from 'lucide-react';
 
-export default function CafeCard({ cafe, isSaved, onSelect, onToggleSave }) {
+export default function CafeCard({ cafe, isSaved, isSaving, onSelect, onToggleSave }) {
 	return <article className="cafe-card" onClick={() => onSelect(cafe)}>
 		<div className="card-image-wrap">
 			<img src={cafe.image} alt="Cafe interior" className="card-image" />
@@ -8,13 +8,13 @@ export default function CafeCard({ cafe, isSaved, onSelect, onToggleSave }) {
 			{cafe.isOpen === true && <span className="status-badge open">Open Now</span>}
 			{cafe.isOpen === false && <span className="status-badge closed">Closed</span>}
 			<span className="distance-badge">{cafe.distance}</span>
-			<span className={`source-badge ${cafe.source === 'overpass' ? 'live' : 'fallback'}`}>{cafe.source === 'overpass' ? 'Live OSM' : 'Fallback'}</span>
-			<button className={`save-button ${isSaved ? 'saved' : ''}`} onClick={(event) => onToggleSave(event, cafe.id)} aria-label={isSaved ? `Remove ${cafe.name} from saved` : `Save ${cafe.name}`}><Heart size={15} fill={isSaved ? 'currentColor' : 'none'} /></button>
+			<span className={`source-badge ${cafe.source === 'database' || cafe.source === 'overpass' ? 'live' : 'fallback'}`}>{cafe.source === 'database' ? 'Supabase + OSM' : cafe.source === 'overpass' ? 'Live OSM' : cafe.source === 'cached' ? 'Cached OSM' : 'Fallback'}</span>
+			<button className={`save-button ${isSaved ? 'saved' : ''}`} onClick={(event) => onToggleSave(event, cafe.id)} disabled={isSaving} aria-label={isSaved ? `Remove ${cafe.name} from saved` : `Save ${cafe.name}`} title={isSaved ? 'Remove from saved cafes' : 'Save cafe'}><Heart size={15} fill={isSaved ? 'currentColor' : 'none'} /></button>
 			<div className="card-title"><h3>{cafe.name}</h3><p>{cafe.address}</p></div>
 		</div>
 		<div className="card-content">
 			<p className="tagline">{cafe.tagline}</p>
-			<div className="metrics"><Metric icon={<Wifi size={13} />} value={cafe.wifiSpeed} label="WiFi" color="cyan" /><Metric icon={<Zap size={13} />} value={cafe.outlets} label="Outlets" color="amber" /><Metric icon={<Volume2 size={13} />} value={cafe.noiseLevel} label="Noise" color="blue" /></div>
+			<div className="metrics"><Metric icon={<Wifi size={13} />} value={cafe.wifiSpeed} label="WiFi" color="cyan" /><Metric icon={<Zap size={13} />} value={cafe.outlets} label="Outlets" color="amber" /><Metric icon={<CreditCard size={13} />} value={cafe.acceptsGcash ? 'Accepted' : 'Not listed'} label="GCash" color="blue" /></div>
 			<div className="card-footer">
 				<span className="rating">{cafe.rating ? <><Star size={14} fill="currentColor" /> {cafe.rating} <small>({cafe.reviewCount})</small></> : 'No rating listed'}</span>
 				<div className="style-tags">{cafe.coffeeStyles.map((style) => <span key={style}>{style}</span>)}</div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bookmark, Coffee, Compass, Map as MapIcon, MessageSquare, Settings } from 'lucide-react';
-import { fetchNearbyCafes } from './services/cafes';
+import { fetchNearbyCafes, fetchSavedCafes, submitCafeCheckin, updateCafeSaved } from './services/cafes';
 import Header from './components/header';
 import FilterBar from './components/filterbar';
 import CafeCard from './components/cafecard';
@@ -48,6 +48,9 @@ export default function App() {
   const [viewMode, setViewMode] = useState(() => getTabFromPath(window.location.pathname) === 'map' ? 'map' : 'grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [savedCafeIds, setSavedCafeIds] = useState(new Set());
+  const [savedCafeRecords, setSavedCafeRecords] = useState([]);
+  const [savingCafeIds, setSavingCafeIds] = useState(new Set());
+  const [savedCafeError, setSavedCafeError] = useState('');
   const [selectedCafe, setSelectedCafe] = useState(null);
   const [focusedCafe, setFocusedCafe] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
@@ -96,12 +99,40 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const session = getStoredSession();
+    if (!authenticatedUser || !session?.access_token) return undefined;
+
+    let isMounted = true;
+    const controller = new AbortController();
+    fetchSavedCafes(session.access_token, controller.signal)
+      .then((records) => {
+        if (!isMounted) return;
+        setSavedCafeRecords(records);
+        setSavedCafeIds(new Set(records.map((cafe) => cafe.id)));
+        setSavedCafeError('');
+      })
+      .catch((error) => {
+        if (isMounted && error.name !== 'AbortError') setSavedCafeError(error.message);
+      });
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [authenticatedUser]);
+
+  useEffect(() => {
     if (!authReady || !authenticatedUser || showLanding || !['discover', 'saved', 'map', 'assistant'].includes(activeTab)) return undefined;
     if (!navigator.geolocation) return undefined;
 
     const watchId = navigator.geolocation.watchPosition(
       ({ coords }) => {
-        setUserLocation({ lat: coords.latitude, lng: coords.longitude });
+        const nextLocation = { lat: coords.latitude, lng: coords.longitude };
+        setUserLocation((previousLocation) => (
+          previousLocation && distanceInMeters(previousLocation, nextLocation) < 250
+            ? previousLocation
+            : nextLocation
+        ));
         setLocationStatus('Live location');
       },
       (error) => {
@@ -120,6 +151,7 @@ export default function App() {
     }
 
     let isMounted = true;
+    const controller = new AbortController();
 
     const loadNearbyCafes = async () => {
       setIsLoadingCafes(true);
@@ -128,13 +160,16 @@ export default function App() {
           lat: userLocation.lat,
           lng: userLocation.lng,
           radius: 10000,
+          signal: controller.signal,
         });
 
         if (isMounted) {
           setCafes(nearby);
         }
       } catch (error) {
-        console.error('Could not fetch nearby cafes:', error);
+        if (error.name !== 'AbortError') {
+          console.error('Could not fetch nearby cafes:', error);
+        }
         if (isMounted) {
           setCafes([]);
         }
@@ -148,13 +183,20 @@ export default function App() {
     loadNearbyCafes();
     return () => {
       isMounted = false;
+      controller.abort();
     };
   }, [userLocation]);
 
-  const nearbyCafes = useMemo(() => {
-    if (!userLocation) return activeTab === 'discover' ? [] : cafes;
+  const cafeRecords = useMemo(() => {
+    const recordsById = new Map(savedCafeRecords.map((cafe) => [cafe.id, cafe]));
+    cafes.forEach((cafe) => recordsById.set(cafe.id, cafe));
+    return [...recordsById.values()];
+  }, [cafes, savedCafeRecords]);
 
-    const cafesWithDistance = cafes
+  const nearbyCafes = useMemo(() => {
+    if (!userLocation) return activeTab === 'discover' ? [] : cafeRecords;
+
+    const cafesWithDistance = cafeRecords
       .map((cafe) => {
         const meters = distanceInMeters(userLocation, cafe.coordinates);
         return {
@@ -168,16 +210,16 @@ export default function App() {
     return activeTab === 'discover'
       ? cafesWithDistance.filter((cafe) => cafe._distanceMeters <= DISCOVER_RADIUS_METERS)
       : cafesWithDistance;
-  }, [cafes, activeTab, userLocation]);
+  }, [cafeRecords, activeTab, userLocation]);
 
   const filteredCafes = useMemo(() => nearbyCafes.filter((cafe) => {
     const query = searchQuery.toLowerCase();
     const matchesSearch = [cafe.name, cafe.address, cafe.tagline].some((value) => value.toLowerCase().includes(query));
-    return matchesSearch && (!filters.openNow || cafe.isOpen) && (!filters.fastWifi || cafe.wifiCategory === 'fast') && (!filters.outlets || cafe.outlets === 'Plentiful') && (!filters.quiet || cafe.noiseLevel === 'Quiet') && (filters.coffeeStyle === 'All' || cafe.coffeeStyles.includes(filters.coffeeStyle)) && (activeTab !== 'saved' || savedCafeIds.has(cafe.id));
+    return matchesSearch && (!filters.openNow || cafe.isOpen) && (!filters.fastWifi || cafe.hasWifi) && (!filters.outlets || cafe.hasOutlets) && (!filters.quiet || cafe.noiseLevel === 'Quiet') && (filters.coffeeStyle === 'All' || cafe.coffeeStyles.includes(filters.coffeeStyle)) && (activeTab !== 'saved' || savedCafeIds.has(cafe.id));
   }), [nearbyCafes, searchQuery, filters, activeTab, savedCafeIds]);
 
   const assistantCafes = nearbyCafes.filter((cafe) => userLocation && distanceInMeters(userLocation, cafe.coordinates) <= DISCOVER_RADIUS_METERS);
-  const savedCafes = cafes.filter((cafe) => savedCafeIds.has(cafe.id));
+  const savedCafes = savedCafeRecords;
 
   useEffect(() => {
     const handlePopState = () => {
@@ -228,25 +270,73 @@ export default function App() {
     } finally {
       clearStoredSession();
       setAuthenticatedUser(null);
+      setSavedCafeIds(new Set());
+      setSavedCafeRecords([]);
+      setSavedCafeError('');
       setIsProfileOpen(false);
       setShowLanding(true);
       window.history.replaceState({}, '', '/');
     }
   };
 
-  const toggleSave = (event, id) => {
-    event.stopPropagation();
-    setSavedCafeIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+  const toggleSave = async (event, id) => {
+    event?.stopPropagation();
+    if (savingCafeIds.has(id)) return;
+
+    const saved = !savedCafeIds.has(id);
+    const session = getStoredSession();
+    if (!session?.access_token) {
+      setSavedCafeError('Your session has expired. Please sign in again.');
+      return;
+    }
+
+    const cafe = [...cafes, ...savedCafeRecords, selectedCafe].find((item) => item?.id === id);
+    setSavingCafeIds((current) => new Set(current).add(id));
+    setSavedCafeError('');
+    try {
+      await updateCafeSaved({ cafeId: id, saved, accessToken: session.access_token });
+      setSavedCafeIds((current) => {
+        const next = new Set(current);
+        if (saved) next.add(id); else next.delete(id);
+        return next;
+      });
+      setSavedCafeRecords((current) => {
+        if (!saved) return current.filter((item) => item.id !== id);
+        if (!cafe) return current;
+        return [cafe, ...current.filter((item) => item.id !== id)];
+      });
+    } catch (error) {
+      setSavedCafeError(error.message || 'Could not update your saved cafes.');
+    } finally {
+      setSavingCafeIds((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
+    }
   };
 
   const navigateToCafe = (cafe) => {
     setFocusedCafe(cafe);
     selectTab('map');
     setSelectedCafe(null);
+  };
+
+  const handleCafeCheckin = async (cafeId, businessLevel) => {
+    const session = getStoredSession();
+    if (!session?.access_token) throw new Error('Your session has expired. Please sign in again.');
+
+    const result = await submitCafeCheckin({ cafeId, businessLevel, accessToken: session.access_token });
+    const aggregate = result ? {
+      busyness: result.business_level,
+      checkinCount: Number(result.checkin_count) || 0,
+      tagline: result.business_level
+        ? `Community reports this cafe is ${result.business_level.replace('_', ' ')}.`
+        : 'Cafe listing from OpenStreetMap. No recent busyness reports.',
+    } : {};
+    setCafes((current) => current.map((cafe) => cafe.id === cafeId ? { ...cafe, ...aggregate } : cafe));
+    setSelectedCafe((current) => current?.id === cafeId ? { ...current, ...aggregate } : current);
+    return result;
   };
 
   const submitReview = (event) => {
@@ -259,7 +349,7 @@ export default function App() {
     setReviewCafe(null);
   };
 
-  if (!authReady) return <div className="auth-check-screen"><div className="auth-check-card">Checking your session…</div></div>;
+  if (!authReady) return <div className="auth-check-screen" aria-busy="true"><div className="auth-check-card" role="status" aria-live="polite"><span className="auth-loading-spinner" aria-hidden="true" />Loading CafeRadar...</div></div>;
   if (!authenticatedUser || showLanding) return <LandingPage onEnter={() => { setShowLanding(false); selectTab('discover'); }} onAuthenticated={handleAuthenticated} />;
 
   const profileName = authenticatedUser?.user_metadata?.full_name || authenticatedUser?.email?.split('@')[0] || 'Jane Doe';
@@ -289,21 +379,22 @@ export default function App() {
               <span className="location-label">{activeTab === 'discover' ? displayedLocationStatus : 'Downtown radius'} <b>{activeTab === 'discover' ? '10 km' : '2 mi'}</b></span>
               {activeTab === 'discover' && <small className="osm-attribution">Cafe data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a></small>}
             </div>
+            {savedCafeError && !selectedCafe && <p className="saved-cafe-error" role="alert">{savedCafeError}</p>}
             {isLoadingCafes ? <div className="empty-state">
               <Coffee size={36} />
               <h2>Finding nearby cafes...</h2>
               <p>Checking the live cafe feed near your current location.</p>
-            </div> : filteredCafes.length ? <div className="cafe-grid">{filteredCafes.map((cafe) => <CafeCard key={cafe.id} cafe={cafe} isSaved={savedCafeIds.has(cafe.id)} onSelect={setSelectedCafe} onToggleSave={toggleSave} />)}</div> : <div className="empty-state">
+            </div> : filteredCafes.length ? <div className="cafe-grid">{filteredCafes.map((cafe) => <CafeCard key={cafe.id} cafe={cafe} isSaved={savedCafeIds.has(cafe.id)} isSaving={savingCafeIds.has(cafe.id)} onSelect={setSelectedCafe} onToggleSave={toggleSave} />)}</div> : <div className="empty-state">
               <Coffee size={36} />
               <h2>{activeTab === 'discover' && !userLocation ? displayedLocationStatus : 'No cafes match your filters'}</h2>
               <p>{activeTab === 'discover' && !userLocation ? 'Allow location access to find cafes near you.' : 'Try relaxing your search criteria or filter tags.'}</p>
             </div>}
-          </section> : <MapView cafes={cafes} focusedCafe={focusedCafe} onClearFocusedCafe={() => setFocusedCafe(null)} onSelect={setSelectedCafe} />}
+          </section> : <MapView cafes={cafeRecords} focusedCafe={focusedCafe} onClearFocusedCafe={() => setFocusedCafe(null)} onSelect={setSelectedCafe} />}
         </>}
       </div>
     </main>
     <RafaelChatWidget activeTab={activeTab} chat={rafaelChat} nearbyCafes={assistantCafes} savedCafes={savedCafes} userLocation={userLocation} userInitials={profileInitials} />
-    <CafeDrawer cafe={selectedCafe} isSaved={selectedCafe && savedCafeIds.has(selectedCafe.id)} onClose={() => setSelectedCafe(null)} onToggleSave={toggleSave} onAddReview={() => setReviewCafe(selectedCafe)} onNavigate={navigateToCafe} />
+    <CafeDrawer key={selectedCafe?.id || 'closed'} cafe={selectedCafe} isSaved={selectedCafe && savedCafeIds.has(selectedCafe.id)} isSaving={selectedCafe && savingCafeIds.has(selectedCafe.id)} saveError={savedCafeError} onClose={() => setSelectedCafe(null)} onToggleSave={toggleSave} onAddReview={() => setReviewCafe(selectedCafe)} onNavigate={navigateToCafe} onCheckin={handleCafeCheckin} />
     <ReviewModal cafe={reviewCafe} rating={reviewRating} setRating={setReviewRating} text={reviewText} setText={setReviewText} onSubmit={submitReview} onClose={() => setReviewCafe(null)} />
     <ProfileDrawer isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} onSignOut={handleSignOut} user={authenticatedUser} savedCount={savedCafeIds.size} reviewCount={cafes.reduce((total, cafe) => total + cafe.reviews.filter((review) => review.author === 'You').length, 0)} />
   </div>;

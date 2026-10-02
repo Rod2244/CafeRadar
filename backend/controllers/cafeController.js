@@ -1,5 +1,26 @@
 const DEFAULT_RADIUS_METERS = 10000;
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=900&q=85';
+const CACHE_FRESH_MS = 5 * 60 * 1000;
+const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const nearbyCafeCache = new Map();
+const cacheRefreshes = new Set();
+
+function getNearbyCafeCacheKey(lat, lng, radius) {
+  return `${Number(lat).toFixed(3)}:${Number(lng).toFixed(3)}:${radius}`;
+}
+
+function cacheNearbyCafes(key, cafes) {
+  nearbyCafeCache.delete(key);
+  nearbyCafeCache.set(key, { cafes, cachedAt: Date.now() });
+
+  while (nearbyCafeCache.size > 200) {
+    nearbyCafeCache.delete(nearbyCafeCache.keys().next().value);
+  }
+}
+
+function markCafesCached(cafes) {
+  return cafes.map((cafe) => ({ ...cafe, source: 'cached' }));
+}
 
 function getOverpassEndpoints() {
   const configured = (process.env.OVERPASS_URLS || process.env.OVERPASS_URL || '')
@@ -221,7 +242,8 @@ function buildFallbackNearbyCafes(lat, lng, radius = DEFAULT_RADIUS_METERS) {
 }
 
 async function fetchNearbyFromOverpass(lat, lng, radius) {
-  const query = `[out:json][timeout:25];(
+  const deadline = Date.now() + 10000;
+  const query = `[out:json][timeout:10];(
     node["amenity"="cafe"](around:${Number(radius)},${lat},${lng});
     way["amenity"="cafe"](around:${Number(radius)},${lat},${lng});
     relation["amenity"="cafe"](around:${Number(radius)},${lat},${lng});
@@ -234,7 +256,7 @@ async function fetchNearbyFromOverpass(lat, lng, radius) {
     const requestAttempts = [
       {
         label: 'POST form body',
-        request: async () => fetch(endpoint, {
+        request: async (timeoutMs) => fetch(endpoint, {
           method: 'POST',
           headers: {
             Accept: 'application/json',
@@ -242,25 +264,28 @@ async function fetchNearbyFromOverpass(lat, lng, radius) {
             'User-Agent': 'CafeRadar/1.0',
           },
           body: new URLSearchParams({ data: query }).toString(),
-          signal: AbortSignal.timeout(20000),
+          signal: AbortSignal.timeout(timeoutMs),
         }),
       },
       {
         label: 'GET query string',
-        request: async () => fetch(`${endpoint}?data=${encodeURIComponent(query)}`, {
+        request: async (timeoutMs) => fetch(`${endpoint}?data=${encodeURIComponent(query)}`, {
           method: 'GET',
           headers: {
             Accept: 'application/json',
             'User-Agent': 'CafeRadar/1.0',
           },
-          signal: AbortSignal.timeout(20000),
+          signal: AbortSignal.timeout(timeoutMs),
         }),
       },
     ];
 
     for (const attempt of requestAttempts) {
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) break;
+
       try {
-        const response = await attempt.request();
+        const response = await attempt.request(Math.min(5000, remainingMs));
 
         if (!response.ok) {
           throw new Error(`Overpass endpoint responded with ${response.status}.`);
@@ -282,6 +307,8 @@ async function fetchNearbyFromOverpass(lat, lng, radius) {
         console.warn(`Overpass request failed for ${endpoint} using ${attempt.label}:`, error.message || error);
       }
     }
+
+    if (Date.now() >= deadline) break;
   }
 
   throw lastError || new Error('All Overpass endpoints failed.');
@@ -289,18 +316,43 @@ async function fetchNearbyFromOverpass(lat, lng, radius) {
 
 export async function getNearbyCafes(req, res) {
   const { lat, lng, radius } = req.location;
+  const searchRadius = radius ?? DEFAULT_RADIUS_METERS;
+  const cacheKey = getNearbyCafeCacheKey(lat, lng, searchRadius);
+  const cached = nearbyCafeCache.get(cacheKey);
+  const cacheAge = cached ? Date.now() - cached.cachedAt : Infinity;
 
-  try {
-    const places = await fetchNearbyFromOverpass(lat, lng, radius ?? DEFAULT_RADIUS_METERS);
-    if (places && places.length > 0) {
-      return res.status(200).json({ source: 'overpass', cafes: places, location: { lat, lng }, radius });
+  if (cached && cacheAge <= CACHE_FRESH_MS) {
+    return res.status(200).json({ source: 'cache', cafes: markCafesCached(cached.cafes), location: { lat, lng }, radius: searchRadius });
+  }
+
+  if (cached && cacheAge <= CACHE_MAX_AGE_MS) {
+    if (!cacheRefreshes.has(cacheKey)) {
+      cacheRefreshes.add(cacheKey);
+      fetchNearbyFromOverpass(lat, lng, searchRadius)
+        .then((places) => {
+          if (places.length > 0) cacheNearbyCafes(cacheKey, places);
+        })
+        .catch((error) => {
+          console.warn('Background Overpass refresh failed:', error.message || error);
+        })
+        .finally(() => cacheRefreshes.delete(cacheKey));
     }
 
-    const fallbackCafes = buildFallbackNearbyCafes(lat, lng, radius ?? DEFAULT_RADIUS_METERS);
-    return res.status(200).json({ source: 'fallback', cafes: fallbackCafes, location: { lat, lng }, radius });
+    return res.status(200).json({ source: 'stale-cache', cafes: markCafesCached(cached.cafes), location: { lat, lng }, radius: searchRadius });
+  }
+
+  try {
+    const places = await fetchNearbyFromOverpass(lat, lng, searchRadius);
+    if (places && places.length > 0) {
+      cacheNearbyCafes(cacheKey, places);
+      return res.status(200).json({ source: 'overpass', cafes: places, location: { lat, lng }, radius: searchRadius });
+    }
+
+    const fallbackCafes = buildFallbackNearbyCafes(lat, lng, searchRadius);
+    return res.status(200).json({ source: 'fallback', cafes: fallbackCafes, location: { lat, lng }, radius: searchRadius });
   } catch (error) {
-    const fallbackCafes = buildFallbackNearbyCafes(lat, lng, radius ?? DEFAULT_RADIUS_METERS);
+    const fallbackCafes = buildFallbackNearbyCafes(lat, lng, searchRadius);
     console.warn('Overpass API failed, using fallback cafe dataset:', error.message || error);
-    return res.status(200).json({ source: 'fallback', cafes: fallbackCafes, location: { lat, lng }, radius });
+    return res.status(200).json({ source: 'fallback', cafes: fallbackCafes, location: { lat, lng }, radius: searchRadius });
   }
 }

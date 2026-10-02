@@ -6,3 +6,12 @@ html, body, #root { height: 100%; }
 body { margin: 0; min-width: 320px; overflow: hidden; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
+.busyness-checkin { display: grid; gap: 8px; margin-top: 11px; }
+.busyness-checkin > label { color: #c3ccdc; font-size: 10px; font-weight: 700; }
+.busyness-checkin > div { display: flex; gap: 8px; }
+.busyness-checkin select,.busyness-checkin button { min-height: 36px; padding: 0 10px; color: var(--text); border: 1px solid var(--line); border-radius: 6px; background: #080f1d; font-size: 11px; }
+.busyness-checkin select { min-width: 0; flex: 1; }
+.busyness-checkin button { color: #111827; border-color: var(--amber); background: var(--amber); font-weight: 700; }
+.busyness-checkin button:disabled { cursor: wait; opacity: .65; }
+.checkin-message { color: var(--green); font-size: 10px; }
+.checkin-message.error { color: #ff9daa; }

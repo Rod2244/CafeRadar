@@ -30,6 +30,14 @@ The Vercel rewrite serves the SPA for app routes such as `/discover` and `/setti
 - Open the Vercel site, refresh a non-root route, and test sign-in, cafe lookup, and the AI assistant.
 - Use browser developer tools to check for failed `/api` requests or CORS errors.
 
+## Cafe database and sync
+
+Before deploying the database-backed cafe endpoint, run `backend/sql/001_cafe_spatial_and_checkins.sql` in the Supabase SQL Editor. It adds the PostGIS location index and trigger, spatial search RPC, and decaying check-in aggregation for the existing `cafes` and `cafe_checkins` tables.
+
+From the `backend` directory, run `npm run sync:cafes` to seed/update named cafes from OpenStreetMap's Overpass API. Configure `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in the local environment; the service-role key must remain server-side. For ongoing updates, schedule that command with a task scheduler or cron provider, for example once per week. The sync merges OSM-tagged attributes without clearing existing Wi-Fi, outlet, or GCash values when OSM has no value for them.
+
+Nearby cafe requests now search the Supabase PostGIS index rather than calling Overpass. Check-ins are authenticated, one current report per user and cafe, and reports older than 24 hours are excluded while newer ones lose influence exponentially.
+
 ## Current application limitation
 
-Saved-cafe selections currently live only in frontend state and are not persisted per user in Supabase. Cafe lookup also depends on public Overpass services, whose availability can vary. These limitations are independent of the hosting setup.
+Saved-cafe selections currently live only in frontend state and are not persisted per user in Supabase. Periodic sync freshness depends on the Overpass service and the configured scheduler.
