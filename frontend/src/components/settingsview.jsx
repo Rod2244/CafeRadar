@@ -84,8 +84,8 @@ export default function SettingsView({ user, onProfileUpdated }) {
       </div>
       <aside className="settings-side">
         <SettingsGroup title="Appearance" icon={<Palette size={16} />}>
-          <div className="appearance-choice"><span className="appearance-icon dark"><Moon size={15} /></span><span><strong>Night radar</strong><small>Best for late work sessions</small></span><span className="selected-dot" /></div>
-          <div className="appearance-choice muted-choice"><span className="appearance-icon light"><Sun size={15} /></span><span><strong>Daylight mode</strong><small>Coming soon</small></span></div>
+          <div className="appearance-choice"><span className="appearance-icon dark"><Sun size={15} /></span><span><strong>Daylight radar</strong><small>Best for early work sessions</small></span><span className="selected-dot" /></div>
+          <div className="appearance-choice muted-choice"><span className="appearance-icon light"><Moon size={15} /></span><span><strong>Night mode</strong><small>Coming soon</small></span></div>
           <ToggleRow title="Reduced motion" description="Use gentler transitions" checked={preferences.reducedMotion} onChange={() => togglePreference('reducedMotion')} />
         </SettingsGroup>
         <SettingsGroup title="Privacy & safety" icon={<LockKeyhole size={16} />}>

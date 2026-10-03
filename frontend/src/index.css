@@ -1,17 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
 
-:root { font-family: 'DM Sans', sans-serif; color: #f4f5f7; background: #070b16; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+:root { font-family: 'DM Sans', sans-serif; color: #2b1d17; background: #f4eee8; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
-body { margin: 0; min-width: 320px; overflow: hidden; }
+body { margin: 0; min-width: 320px; overflow: hidden; background: radial-gradient(circle at top, rgba(199,123,53,.12), transparent 28%), linear-gradient(180deg, #f7f1ea 0%, #efe3d6 100%); }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 .busyness-checkin { display: grid; gap: 8px; margin-top: 11px; }
-.busyness-checkin > label { color: #c3ccdc; font-size: 10px; font-weight: 700; }
+.busyness-checkin > label { color: #654833; font-size: 10px; font-weight: 700; }
 .busyness-checkin > div { display: flex; gap: 8px; }
-.busyness-checkin select,.busyness-checkin button { min-height: 36px; padding: 0 10px; color: var(--text); border: 1px solid var(--line); border-radius: 6px; background: #080f1d; font-size: 11px; }
-.busyness-checkin select { min-width: 0; flex: 1; }
-.busyness-checkin button { color: #111827; border-color: var(--amber); background: var(--amber); font-weight: 700; }
+.busyness-checkin select,.busyness-checkin button { min-height: 36px; padding: 0 10px; color: #2b1d17; border: 1px solid #d9c3aa; border-radius: 6px; background: #fffdf9; font-size: 11px; }
+.busyness-checkin select { min-width: 0; flex: 1; color-scheme: light; }
+.busyness-checkin select option { color: #2b1d17; background: #fffdf9; }
+.busyness-checkin button { color: #fffaf5; border-color: #a96532; background: #a96532; font-weight: 700; }
+.busyness-checkin button:hover { background: #8e542c; }
 .busyness-checkin button:disabled { cursor: wait; opacity: .65; }
-.checkin-message { color: var(--green); font-size: 10px; }
-.checkin-message.error { color: #ff9daa; }
+.checkin-message { color: #426e4b; font-size: 10px; }
+.checkin-message.error { color: #91483a; }
